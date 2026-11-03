@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>VR 실습 스켈레톤 — A-Frame</title>
+  <!--
+    Deploy note (Cloudflare Pages / GitHub Pages, either works — HTTPS required for WebXR):
+    - Upload this folder as-is. All paths are relative; do not use /assets/... absolute paths
+      on a project site (username.github.io/repo-name), or assets will 404.
+    - Keep the empty .nojekyll file next to this file for GitHub Pages (skips Jekyll).
+    - Single GLB files over 25 MiB need compressing/splitting on Cloudflare Pages free tier.
+    - This skeleton has NO model yet: the UR5 model / FABRIK code go in the marked slots below.
+  -->
+  <script src="https://aframe.io/releases/1.8.0/aframe.min.js"></script>
+  <style>
+    body { margin: 0; font-family: system-ui, sans-serif; }
+    #version {
+      position: fixed; left: 12px; top: 12px; z-index: 10;
+      background: rgba(0,0,0,.65); color: #fff; padding: 8px 12px; border-radius: 8px;
+      font-size: 14px; line-height: 1.5;
+    }
+    #version small { opacity: .75; }
+  </style>
+</head>
+<body>
+  <div id="version">버전 확인 중…<br><small>콘솔 대신 화면에 표시됩니다. Quest 브라우저에서도 확인 가능.</small></div>
+
+  <a-scene background="color: #eceff1" renderer="antialias: true">
+    <!-- Camera rig: desktop WASD + mouse; Quest enters VR with the built-in button -->
+    <a-entity id="rig" position="0 0 3">
+      <a-entity camera look-controls wasd-controls></a-entity>
+    </a-entity>
+
+    <!-- Ground + simple stand-ins (NOT a UR5 model — placeholders only) -->
+    <a-plane position="0 0 0" rotation="-90 0 0" width="10" height="10" color="#7BC8A4"></a-plane>
+    <a-box position="-1 0.5 -2" color="#4CC3D9" depth="1" height="1" width="1"></a-box>
+    <!-- Target placeholder: the FABRIK prototype will later move an arm toward this -->
+    <a-sphere id="target" position="1 1 -2" radius="0.2" color="#EF2D5E"></a-sphere>
+
+    <!--
+      LATER — UR5 model slot (keep relative):
+      <a-entity gltf-model="assets/ur5.glb" position="0 0 -2"></a-entity>
+      LATER — FABRIK slot: a component that reads #target position and writes joint
+      positions, then verifies with FK (target error, joint limits, end orientation).
+      Do NOT default to three-ik here: its maintenance / r184 compatibility is unverified
+      (last seen info: @dannadori/three-ik 0.1.1, 2022).
+    -->
+  </a-scene>
+
+  <script>
+    document.querySelector('a-scene').addEventListener('loaded', function () {
+      var v = 'A-Frame ' + AFRAME.version + ' / THREE r' + AFRAME.THREE.REVISION;
+      document.getElementById('version').innerHTML =
+        v + '<br><small>이 값이 1.8.0 / r184면 스택 고정 확인 완료. 다르면 CDN을 바꾸지 말고 알려주세요.</small>';
+      console.log(v);
+    });
+  </script>
+</body>
+</html>
