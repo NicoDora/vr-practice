@@ -1,0 +1,135 @@
+AFRAME.registerComponent("mouse-grabbable", {
+  init: function () {
+    var el = this.el;
+    var sceneEl = el.sceneEl;
+    var material = el.getAttribute("material");
+    var originalColor =
+      material && material.color ? material.color : "#FFF";
+    var hoverColor = "rgb(215, 123, 31)";
+    var grabbed = false;
+    var hovered = false;
+    var lookControls = null;
+    var lookControlsPaused = false;
+
+    // 마우스가 움직이는 동안 카메라에서 발사할 광선과 드래그 평면
+    var raycaster = new THREE.Raycaster();
+    var mouse = new THREE.Vector2();
+    var dragPlane = new THREE.Plane();
+    var cameraDirection = new THREE.Vector3();
+    var objectWorldPosition = new THREE.Vector3();
+    var intersectionPoint = new THREE.Vector3();
+    var targetWorldPosition = new THREE.Vector3();
+    var dragOffset = new THREE.Vector3();
+
+    this.onMouseEnter = function () {
+      hovered = true;
+      if (!grabbed) el.setAttribute("material", "color", hoverColor);
+    };
+
+    this.onMouseLeave = function () {
+      hovered = false;
+      if (!grabbed) el.setAttribute("material", "color", originalColor);
+    };
+
+    this.onMouseDown = function (event) {
+      if (grabbed || !sceneEl.camera) return;
+
+      var camera = sceneEl.camera;
+      camera.updateMatrixWorld(true);
+      el.object3D.updateMatrixWorld(true);
+      el.object3D.getWorldPosition(objectWorldPosition);
+
+      // 클릭한 표면을 지나는 카메라 정면 방향의 평면을 만든다.
+      // 오브젝트 중심이 아닌 클릭 위치를 기준으로 오프셋을 계산해
+      // 드래그를 시작할 때 오브젝트가 튀는 현상을 방지한다.
+      var intersection = event.detail && event.detail.intersection;
+      if (intersection && intersection.point) {
+        intersectionPoint.copy(intersection.point);
+      } else {
+        intersectionPoint.copy(objectWorldPosition);
+      }
+
+      camera.getWorldDirection(cameraDirection);
+      dragPlane.setFromNormalAndCoplanarPoint(
+        cameraDirection,
+        intersectionPoint,
+      );
+      dragOffset.copy(objectWorldPosition).sub(intersectionPoint);
+
+      grabbed = true;
+      console.log("grab", el.id);
+      el.setAttribute("material", "color", "#EF2D5E");
+
+      // 드래그 중 마우스 이동이 카메라 회전과 겹치지 않도록 한다.
+      var cameraEl = camera.el || sceneEl.querySelector("[camera]");
+      lookControls = cameraEl && cameraEl.components["look-controls"];
+      if (lookControls && lookControls.isPlaying) {
+        lookControls.pause();
+        lookControlsPaused = true;
+      }
+    };
+
+    this.onMouseMove = function (event) {
+      if (!grabbed || !sceneEl.camera || !sceneEl.canvas) return;
+
+      var rect = sceneEl.canvas.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+
+      // 브라우저 화면 좌표를 Three.js의 정규화 장치 좌표(-1~1)로 변환
+      mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+      mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+      var camera = sceneEl.camera;
+      camera.updateMatrixWorld(true);
+      raycaster.setFromCamera(mouse, camera);
+
+      // 마우스 광선과 처음 잡았던 평면의 교점을 오브젝트 위치로 사용
+      if (!raycaster.ray.intersectPlane(dragPlane, intersectionPoint))
+        return;
+
+      targetWorldPosition.copy(intersectionPoint).add(dragOffset);
+
+      // 부모 요소가 있는 경우에도 올바른 로컬 좌표가 되도록 변환
+      var parent = el.object3D.parent;
+      if (parent) {
+        parent.updateMatrixWorld(true);
+        parent.worldToLocal(targetWorldPosition);
+      }
+      el.object3D.position.copy(targetWorldPosition);
+    };
+
+    this.onMouseUp = function () {
+      if (!grabbed) return;
+
+      grabbed = false;
+      console.log("release", el.id);
+      el.setAttribute(
+        "material",
+        "color",
+        hovered ? hoverColor : originalColor,
+      );
+
+      if (lookControlsPaused && lookControls) {
+        lookControls.play();
+      }
+      lookControls = null;
+      lookControlsPaused = false;
+    };
+
+    el.addEventListener("mouseenter", this.onMouseEnter);
+    el.addEventListener("mouseleave", this.onMouseLeave);
+    el.addEventListener("mousedown", this.onMouseDown);
+    window.addEventListener("mousemove", this.onMouseMove);
+    window.addEventListener("mouseup", this.onMouseUp);
+    window.addEventListener("blur", this.onMouseUp);
+  },
+
+  remove: function () {
+    this.el.removeEventListener("mouseenter", this.onMouseEnter);
+    this.el.removeEventListener("mouseleave", this.onMouseLeave);
+    this.el.removeEventListener("mousedown", this.onMouseDown);
+    window.removeEventListener("mousemove", this.onMouseMove);
+    window.removeEventListener("mouseup", this.onMouseUp);
+    window.removeEventListener("blur", this.onMouseUp);
+  },
+});
