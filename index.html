@@ -6,6 +6,7 @@
     <title>VR 실습 1주차</title>
     <script src="https://aframe.io/releases/1.8.0/aframe.min.js"></script>
     <script src="js/components/mouse-grabbable.js"></script>
+    <script src="js/components/vr-grabber.js"></script>
   </head>
   <body>
     <a-scene cursor__mouse="rayOrigin: mouse" raycaster="objects: .grabbable">
@@ -21,11 +22,13 @@
       <a-entity
         id="rightHand"
         laser-controls="hand: right"
+        vr-grabber
         raycaster="objects: .grabbable; far: 10"
       ></a-entity>
       <a-entity
         id="leftHand"
         laser-controls="hand: left"
+        vr-grabber
         raycaster="objects: .grabbable; far: 10"
       ></a-entity>
 
