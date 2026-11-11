@@ -61,10 +61,22 @@ AFRAME.registerComponent("vr-grabber", {
       stickY = event.detail.y;
     };
 
+    // laser-controls는 연결이 끊겨도 레이 선만 숨기고 판정은 계속한다.
+    // 그래서 멈춘 위치의 레이가 오브젝트를 계속 가리키지 않도록 raycaster를 직접 켜고 끈다.
+    // (raycaster를 끄면 cursor가 mouseleave를 보내 호버도 풀린다)
+    function setRayEnabled(enabled) {
+      el.setAttribute("raycaster", "enabled", enabled);
+    }
+
+    this.onControllerConnected = function () {
+      setRayEnabled(true);
+    };
+
     // 컨트롤러 연결이 끊기거나 VR에서 나가면 들고 있던 오브젝트를 놓는다.
     this.onForceRelease = function () {
       stickY = 0;
       release();
+      setRayEnabled(false);
     };
 
     // 썸스틱 위아래로 레이저 방향을 따라 오브젝트를 밀거나 당긴다.
@@ -97,6 +109,7 @@ AFRAME.registerComponent("vr-grabber", {
     el.addEventListener("gripdown", this.onGripDown);
     el.addEventListener("gripup", this.onGripUp);
     el.addEventListener("thumbstickmoved", this.onThumbstickMoved);
+    el.addEventListener("controllerconnected", this.onControllerConnected);
     el.addEventListener("controllerdisconnected", this.onForceRelease);
     sceneEl.addEventListener("exit-vr", this.onForceRelease);
   },
@@ -110,6 +123,10 @@ AFRAME.registerComponent("vr-grabber", {
     this.el.removeEventListener("gripdown", this.onGripDown);
     this.el.removeEventListener("gripup", this.onGripUp);
     this.el.removeEventListener("thumbstickmoved", this.onThumbstickMoved);
+    this.el.removeEventListener(
+      "controllerconnected",
+      this.onControllerConnected,
+    );
     this.el.removeEventListener(
       "controllerdisconnected",
       this.onForceRelease,
