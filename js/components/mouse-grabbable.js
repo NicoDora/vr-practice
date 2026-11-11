@@ -12,9 +12,11 @@ AFRAME.registerComponent("mouse-grabbable", {
     var lookControls = null;
     var lookControlsPaused = false;
 
+    // 거리 제한은 세 입력 방식이 함께 쓰므로 grab-settings 시스템에서 가져온다.
+    // (씬 속성을 바꾸면 data 객체가 새로 만들어지므로 매번 system.data에서 읽는다)
+    var settings = sceneEl.systems["grab-settings"];
+
     // Pull/Push 설정 (단위: m)
-    var minDistance = 0.5;
-    var maxDistance = 10;
     var wheelStep = 0.25;
     var keySpeed = 2; // Q/E를 누르고 있을 때 초당 이동 거리
     var pullKeyPressed = false;
@@ -59,8 +61,8 @@ AFRAME.registerComponent("mouse-grabbable", {
       var currentDistance = -dragPlane.distanceToPoint(cameraWorldPosition);
       var nextDistance = THREE.MathUtils.clamp(
         currentDistance + delta,
-        minDistance,
-        maxDistance,
+        settings.data.minDistance,
+        settings.data.maxDistance,
       );
       dragPlane.constant -= nextDistance - currentDistance;
       updatePosition();
