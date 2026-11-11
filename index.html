@@ -7,6 +7,7 @@
     <script src="https://aframe.io/releases/1.8.0/aframe.min.js"></script>
     <script src="js/components/mouse-grabbable.js"></script>
     <script src="js/components/vr-grabber.js"></script>
+    <script src="js/components/hand-grabber.js"></script>
   </head>
   <body>
     <a-scene cursor__mouse="rayOrigin: mouse" raycaster="objects: .grabbable">
@@ -30,6 +31,21 @@
         laser-controls="hand: left"
         vr-grabber
         raycaster="objects: .grabbable; far: 10"
+      ></a-entity>
+
+      <a-entity
+        id="rightHandTracking"
+        hand-tracking-controls="hand: right"
+        hand-grabber
+        raycaster="objects: .grabbable; far: 10; showLine: true"
+        cursor="rayOrigin: entity; fuse: false"
+      ></a-entity>
+      <a-entity
+        id="leftHandTracking"
+        hand-tracking-controls="hand: left"
+        hand-grabber
+        raycaster="objects: .grabbable; far: 10; showLine: true"
+        cursor="rayOrigin: entity; fuse: false"
       ></a-entity>
 
       <a-sky color="#ECECEC"></a-sky>
