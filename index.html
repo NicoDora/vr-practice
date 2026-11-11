@@ -6,6 +6,7 @@
     <title>VR 실습 1주차</title>
     <script src="https://aframe.io/releases/1.8.0/aframe.min.js"></script>
     <script src="js/systems/grab-settings.js"></script>
+    <script src="js/components/grab-highlight.js"></script>
     <script src="js/components/mouse-grabbable.js"></script>
     <script src="js/components/vr-grabber.js"></script>
     <script src="js/components/hand-grabber.js"></script>
@@ -58,6 +59,7 @@
 
       <a-box
         id="box1"
+        grab-highlight
         mouse-grabbable
         class="grabbable"
         position="-1 0.5 -2"
@@ -68,6 +70,7 @@
       ></a-box>
       <a-cylinder
         id="cylinder1"
+        grab-highlight
         mouse-grabbable
         class="grabbable"
         position="0.5 0.5 -2.5"

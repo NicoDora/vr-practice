@@ -1,14 +1,11 @@
+// 마우스로 잡기, 드래그, 휠/Q/E Pull/Push를 담당한다. 색과 호버는 grab-highlight 컴포넌트가 처리한다.
 AFRAME.registerComponent("mouse-grabbable", {
+  dependencies: ["grab-highlight"],
+
   init: function () {
     var el = this.el;
     var sceneEl = el.sceneEl;
-    var material = el.getAttribute("material");
-    var originalColor =
-      material && material.color ? material.color : "#FFF";
-    var hoverColor = "rgb(215, 123, 31)";
-    var grabColor = "#EF2D5E";
     var grabbed = false; // 마우스로 잡고 있는지 (VR로 잡힌 상태는 el.is("grabbed"))
-    var hoverCursors = []; // 마우스, 양손 레이저가 동시에 가리킬 수 있어 cursor 목록으로 관리
     var lookControls = null;
     var lookControlsPaused = false;
 
@@ -67,31 +64,6 @@ AFRAME.registerComponent("mouse-grabbable", {
       dragPlane.constant -= nextDistance - currentDistance;
       updatePosition();
     }
-
-    // 마우스든 VR이든 잡힘/호버 상태에 따라 색을 한곳에서 정한다.
-    function updateColor() {
-      var color = originalColor;
-      if (el.is("grabbed")) color = grabColor;
-      else if (hoverCursors.length) color = hoverColor;
-      el.setAttribute("material", "color", color);
-    }
-
-    this.onMouseEnter = function (event) {
-      var cursorEl = event.detail && event.detail.cursorEl;
-      if (hoverCursors.indexOf(cursorEl) === -1) hoverCursors.push(cursorEl);
-      updateColor();
-    };
-
-    this.onMouseLeave = function (event) {
-      var cursorEl = event.detail && event.detail.cursorEl;
-      var index = hoverCursors.indexOf(cursorEl);
-      if (index !== -1) hoverCursors.splice(index, 1);
-      updateColor();
-    };
-
-    this.onStateChange = function (event) {
-      if (event.target === el && event.detail === "grabbed") updateColor();
-    };
 
     this.onMouseDown = function (event) {
       if (grabbed || el.is("grabbed") || !sceneEl.camera) return;
@@ -201,11 +173,7 @@ AFRAME.registerComponent("mouse-grabbable", {
       moveDistance(direction * keySpeed * (timeDelta / 1000));
     };
 
-    el.addEventListener("mouseenter", this.onMouseEnter);
-    el.addEventListener("mouseleave", this.onMouseLeave);
     el.addEventListener("mousedown", this.onMouseDown);
-    el.addEventListener("stateadded", this.onStateChange);
-    el.addEventListener("stateremoved", this.onStateChange);
     window.addEventListener("mousemove", this.onMouseMove);
     window.addEventListener("mouseup", this.onMouseUp);
     window.addEventListener("wheel", this.onWheel, { passive: false });
@@ -219,11 +187,7 @@ AFRAME.registerComponent("mouse-grabbable", {
   },
 
   remove: function () {
-    this.el.removeEventListener("mouseenter", this.onMouseEnter);
-    this.el.removeEventListener("mouseleave", this.onMouseLeave);
     this.el.removeEventListener("mousedown", this.onMouseDown);
-    this.el.removeEventListener("stateadded", this.onStateChange);
-    this.el.removeEventListener("stateremoved", this.onStateChange);
     window.removeEventListener("mousemove", this.onMouseMove);
     window.removeEventListener("mouseup", this.onMouseUp);
     window.removeEventListener("wheel", this.onWheel);
