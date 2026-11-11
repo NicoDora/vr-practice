@@ -13,6 +13,7 @@ AFRAME.registerComponent("hand-grabber", {
     var lostTrackingTimeout = 300; // 손 추적을 이 시간(ms) 이상 잃으면 놓는다.
 
     // WebXR 손 관절 번호 (hand-tracking-controls의 jointPoses 순서)
+    var WRIST_INDEX = 0;
     var THUMB_TIP_INDEX = 4;
     var INDEX_PROXIMAL_INDEX = 6;
     var INDEX_TIP_INDEX = 9;
@@ -25,18 +26,28 @@ AFRAME.registerComponent("hand-grabber", {
     var lostTrackingTime = 0;
 
     var jointMatrix = new THREE.Matrix4();
+    var handMatrixInverse = new THREE.Matrix4();
     var thumbTipPosition = new THREE.Vector3();
-    var pinchPosition = new THREE.Vector3();
+    var pinchPosition = new THREE.Vector3(); // 손 엔티티(rig) 기준 좌표
     var lastPinchPosition = new THREE.Vector3();
+    var nearPinchPosition = new THREE.Vector3();
     var headPosition = new THREE.Vector3();
     var headForward = new THREE.Vector3();
     var shoulderPosition = new THREE.Vector3();
-    var rayOrigin = new THREE.Vector3();
-    var rayDirection = new THREE.Vector3();
+    var rayOrigin = new THREE.Vector3(); // 월드 좌표
+    var rayDirection = new THREE.Vector3(); // 월드 좌표
+    var localRayOrigin = new THREE.Vector3();
+    var localRayDirection = new THREE.Vector3();
     var grabOffset = new THREE.Vector3();
     var targetWorldPosition = new THREE.Vector3();
     var pinchDelta = new THREE.Vector3();
     var targetBox = new THREE.Box3();
+    // 가까이 잡은 오브젝트를 붙여 둘 손목 위치. hand-tracking-controls의 wristObject3D는
+    // rig 이동을 반영하지 않아서, rig까지 반영한 월드 위치로 직접 갱신한다.
+    var grabAnchor = new THREE.Object3D();
+    sceneEl.object3D.add(grabAnchor);
+    this.grabAnchor = grabAnchor;
+
     var raycasterData = {
       origin: { x: 0, y: 0, z: 0 },
       direction: { x: 0, y: 0, z: -1 },
@@ -58,16 +69,36 @@ AFRAME.registerComponent("hand-grabber", {
       );
     }
 
-    // 관절 위치를 꺼낸다. hand-tracking-controls가 엔티티를 원점에 두므로 월드 좌표와 같다.
-    function getJointPosition(index, out) {
+    // 관절 좌표는 손 엔티티 기준(= rig 기준)이다. rig가 움직였을 수 있으니 월드 행렬을 최신으로 맞춘다.
+    function updateHandMatrix() {
+      el.object3D.updateWorldMatrix(true, false);
+    }
+
+    function getJointLocalPosition(index, out) {
       jointMatrix.fromArray(getHandControls().jointPoses, index * 16);
       return out.setFromMatrixPosition(jointMatrix);
     }
 
+    function getJointWorldPosition(index, out) {
+      return getJointLocalPosition(index, out).applyMatrix4(el.object3D.matrixWorld);
+    }
+
+    // Pull/Push 계산은 rig 이동에 영향받지 않도록 손 엔티티 기준 좌표로 한다.
     function updatePinchPosition() {
-      getJointPosition(THUMB_TIP_INDEX, thumbTipPosition);
-      getJointPosition(INDEX_TIP_INDEX, pinchPosition);
+      getJointLocalPosition(THUMB_TIP_INDEX, thumbTipPosition);
+      getJointLocalPosition(INDEX_TIP_INDEX, pinchPosition);
       pinchPosition.add(thumbTipPosition).multiplyScalar(0.5);
+    }
+
+    function updateGrabAnchor() {
+      jointMatrix.fromArray(getHandControls().jointPoses, WRIST_INDEX * 16);
+      jointMatrix.premultiply(el.object3D.matrixWorld);
+      jointMatrix.decompose(
+        grabAnchor.position,
+        grabAnchor.quaternion,
+        grabAnchor.scale,
+      );
+      grabAnchor.updateMatrixWorld(true);
     }
 
     // 레이는 "추정 어깨 → 검지 첫 마디" 방향으로 쏜다.
@@ -87,15 +118,20 @@ AFRAME.registerComponent("hand-grabber", {
         headPosition.z + headForward.x * shoulderOffsetSide * side,
       );
 
-      getJointPosition(INDEX_PROXIMAL_INDEX, rayOrigin);
+      getJointWorldPosition(INDEX_PROXIMAL_INDEX, rayOrigin);
       rayDirection.copy(rayOrigin).sub(shoulderPosition).normalize();
 
-      raycasterData.origin.x = rayOrigin.x;
-      raycasterData.origin.y = rayOrigin.y;
-      raycasterData.origin.z = rayOrigin.z;
-      raycasterData.direction.x = rayDirection.x;
-      raycasterData.direction.y = rayDirection.y;
-      raycasterData.direction.z = rayDirection.z;
+      // raycaster의 origin/direction은 엔티티 기준 값이라 다시 로컬로 바꿔서 넣는다.
+      handMatrixInverse.copy(el.object3D.matrixWorld).invert();
+      localRayOrigin.copy(rayOrigin).applyMatrix4(handMatrixInverse);
+      localRayDirection.copy(rayDirection).transformDirection(handMatrixInverse);
+
+      raycasterData.origin.x = localRayOrigin.x;
+      raycasterData.origin.y = localRayOrigin.y;
+      raycasterData.origin.z = localRayOrigin.z;
+      raycasterData.direction.x = localRayDirection.x;
+      raycasterData.direction.y = localRayDirection.y;
+      raycasterData.direction.z = localRayDirection.z;
       el.setAttribute("raycaster", raycasterData);
     }
 
@@ -118,7 +154,10 @@ AFRAME.registerComponent("hand-grabber", {
     }
 
     // 1) 손이 직접 닿은 오브젝트 → 손목에 붙여서 위치와 회전을 따라가게 한다.
-    function tryNearGrab(position) {
+    function tryNearGrab(localPosition) {
+      var position = nearPinchPosition
+        .copy(localPosition)
+        .applyMatrix4(el.object3D.matrixWorld);
       var targets = sceneEl.querySelectorAll(".grabbable");
       for (var i = 0; i < targets.length; i++) {
         var target = targets[i];
@@ -130,7 +169,8 @@ AFRAME.registerComponent("hand-grabber", {
         heldEl = target;
         isNearGrab = true;
         originalParent = target.object3D.parent;
-        getHandControls().wristObject3D.attach(target.object3D);
+        updateGrabAnchor();
+        grabAnchor.attach(target.object3D);
         return true;
       }
       return false;
@@ -161,8 +201,9 @@ AFRAME.registerComponent("hand-grabber", {
     }
 
     this.onPinchStarted = function (event) {
-      if (heldEl) return;
+      if (heldEl || !isTracking()) return;
 
+      updateHandMatrix();
       if (tryNearGrab(event.detail.position) || tryFarGrab()) {
         console.log("hand grab", heldEl.id, isNearGrab ? "(near)" : "(far)");
         heldEl.addState("grabbed");
@@ -186,7 +227,7 @@ AFRAME.registerComponent("hand-grabber", {
       lastPinchPosition.copy(pinchPosition);
 
       // 레이 시작점도 손과 함께 움직이므로, 나머지 (pushGain - 1)배만 더하면 총 pushGain배가 된다.
-      var handDelta = pinchDelta.dot(rayDirection);
+      var handDelta = pinchDelta.dot(localRayDirection);
       grabDistance = THREE.MathUtils.clamp(
         grabDistance + handDelta * (pushGain - 1),
         minDistance,
@@ -218,7 +259,9 @@ AFRAME.registerComponent("hand-grabber", {
 
       lostTrackingTime = 0;
       setRayActive(true);
+      updateHandMatrix();
       updateRay();
+      if (heldEl && isNearGrab) updateGrabAnchor();
       if (heldEl && !isNearGrab) updateFarGrab();
     };
 
@@ -236,6 +279,7 @@ AFRAME.registerComponent("hand-grabber", {
 
   remove: function () {
     this.release();
+    this.grabAnchor.removeFromParent();
     this.el.removeEventListener("pinchstarted", this.onPinchStarted);
     this.el.removeEventListener("pinchended", this.onPinchEnded);
     this.el.removeEventListener("controllerdisconnected", this.onForceRelease);

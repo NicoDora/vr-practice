@@ -8,45 +8,42 @@
     <script src="js/components/mouse-grabbable.js"></script>
     <script src="js/components/vr-grabber.js"></script>
     <script src="js/components/hand-grabber.js"></script>
+    <script src="js/components/rig-movement.js"></script>
   </head>
   <body>
     <a-scene cursor__mouse="rayOrigin: mouse" raycaster="objects: .grabbable">
-      <a-entity id="rig" position="0 0 0">
+      <!-- rig를 움직이면 카메라, 컨트롤러, 손이 함께 이동한다. -->
+      <a-entity id="rig" position="0 0 0" rig-movement>
+        <a-entity camera look-controls position="0 1.6 0"></a-entity>
+
         <a-entity
-          camera
-          look-controls
-          wasd-controls
-          position="0 1.6 0"
+          id="rightHand"
+          laser-controls="hand: right"
+          vr-grabber
+          raycaster="objects: .grabbable; far: 10; enabled: false"
+        ></a-entity>
+        <a-entity
+          id="leftHand"
+          laser-controls="hand: left"
+          vr-grabber
+          raycaster="objects: .grabbable; far: 10; enabled: false"
+        ></a-entity>
+
+        <a-entity
+          id="rightHandTracking"
+          hand-tracking-controls="hand: right"
+          hand-grabber
+          raycaster="objects: .grabbable; far: 10; showLine: true"
+          cursor="rayOrigin: entity; fuse: false"
+        ></a-entity>
+        <a-entity
+          id="leftHandTracking"
+          hand-tracking-controls="hand: left"
+          hand-grabber
+          raycaster="objects: .grabbable; far: 10; showLine: true"
+          cursor="rayOrigin: entity; fuse: false"
         ></a-entity>
       </a-entity>
-
-      <a-entity
-        id="rightHand"
-        laser-controls="hand: right"
-        vr-grabber
-        raycaster="objects: .grabbable; far: 10; enabled: false"
-      ></a-entity>
-      <a-entity
-        id="leftHand"
-        laser-controls="hand: left"
-        vr-grabber
-        raycaster="objects: .grabbable; far: 10; enabled: false"
-      ></a-entity>
-
-      <a-entity
-        id="rightHandTracking"
-        hand-tracking-controls="hand: right"
-        hand-grabber
-        raycaster="objects: .grabbable; far: 10; showLine: true"
-        cursor="rayOrigin: entity; fuse: false"
-      ></a-entity>
-      <a-entity
-        id="leftHandTracking"
-        hand-tracking-controls="hand: left"
-        hand-grabber
-        raycaster="objects: .grabbable; far: 10; showLine: true"
-        cursor="rayOrigin: entity; fuse: false"
-      ></a-entity>
 
       <a-sky color="#ECECEC"></a-sky>
 
