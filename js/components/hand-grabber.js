@@ -1,5 +1,29 @@
 AFRAME.registerComponent("hand-grabber", {
+  // 멀리 잡은 오브젝트의 Pull/Push 배율 설정
+  // 배율 = 속도 계수 × 거리 계수
+  //   속도 계수: 손이 느리면 minSpeedGain, 빠르면 maxSpeedGain까지 부드럽게 증가 (PRISM)
+  //   거리 계수: 어깨~물체가 가까우면 1배, 멀면 maxDistanceGain까지 부드럽게 증가 (Go-Go)
+  // 실행 중에 바꾸려면 DevTools에서
+  //   document.querySelectorAll("[hand-grabber]").forEach(e => e.setAttribute("hand-grabber", "maxSpeedGain", 4))
+  schema: {
+    gainMode: { default: "adaptive", oneOf: ["adaptive", "fixed"] }, // fixed: 비교 측정용 고정 배율
+    fixedGain: { default: 4 }, // gainMode가 fixed일 때 쓰는 배율
+
+    minSpeedGain: { default: 1 }, // 손이 slowSpeed 이하로 느릴 때의 속도 계수
+    maxSpeedGain: { default: 3 }, // 손이 fastSpeed 이상으로 빠를 때의 속도 계수
+    slowSpeed: { default: 0.05 }, // m/s, 이보다 느리면 정밀 조작으로 본다.
+    fastSpeed: { default: 0.5 }, // m/s, 이보다 빠르면 최대로 가속한다.
+    speedSmoothing: { default: 0.1 }, // s, 손 속도 저역통과 필터의 시간 상수 (클수록 부드럽지만 늦게 반응)
+
+    maxDistanceGain: { default: 2 }, // 어깨~물체가 farDistance 이상일 때의 거리 계수
+    nearDistance: { default: 1 }, // m, 이보다 가까우면 거리 계수 1배
+    farDistance: { default: 6 }, // m, 이보다 멀면 거리 계수 최대
+
+    debug: { default: false }, // true면 손 속도와 배율을 콘솔에 찍는다.
+  },
+
   init: function () {
+    var component = this;
     var el = this.el;
     var sceneEl = el.sceneEl;
 
@@ -7,8 +31,7 @@ AFRAME.registerComponent("hand-grabber", {
     // (씬 속성을 바꾸면 data 객체가 새로 만들어지므로 매번 system.data에서 읽는다)
     var settings = sceneEl.systems["grab-settings"];
 
-    // Pull/Push 설정 (단위: m)
-    var pushGain = 4; // 멀리 잡은 상태에서 손을 앞뒤로 움직인 거리의 몇 배만큼 오브젝트가 움직일지
+    // 잡기 설정 (단위: m)
     var nearGrabMargin = 0.02; // 가까이 잡기 판정 시 바운딩 박스에 더할 여유
     var shoulderOffsetSide = 0.15; // 머리 기준 추정 어깨 위치 (손 쪽 옆으로)
     var shoulderOffsetDown = 0.15; // 머리 기준 추정 어깨 위치 (아래로)
@@ -26,6 +49,12 @@ AFRAME.registerComponent("hand-grabber", {
     var grabDistance = 0;
     var rayActive = true;
     var lostTrackingTime = 0;
+    var smoothedSpeed = 0; // 레이 방향 손 속도 (m/s), 떨림을 걸러낸 값
+    var debugLogTime = 0;
+
+    // 현재 배율 상태. DevTools에서 document.querySelector("[hand-grabber]").components["hand-grabber"].gainState로 볼 수 있다.
+    var gainState = { speed: 0, shoulderDistance: 0, speedGain: 1, distanceGain: 1, gain: 1 };
+    this.gainState = gainState;
 
     var jointMatrix = new THREE.Matrix4();
     var handMatrixInverse = new THREE.Matrix4();
@@ -197,6 +226,7 @@ AFRAME.registerComponent("hand-grabber", {
         grabOffset.sub(intersections[i].point);
         updatePinchPosition();
         lastPinchPosition.copy(pinchPosition);
+        smoothedSpeed = 0; // 잡는 순간은 정밀 조작부터 시작한다.
         return true;
       }
       return false;
@@ -222,16 +252,66 @@ AFRAME.registerComponent("hand-grabber", {
       setRayActive(false);
     };
 
+    // 레이 방향 손 속도를 저역통과 필터(지수이동평균)로 걸러서 갱신한다.
+    // 핸드트래킹 떨림이 그대로 들어가면 배율이 프레임마다 튀기 때문
+    function updateHandSpeed(handDelta, timeDelta) {
+      if (!(timeDelta > 0)) return;
+      var seconds = timeDelta / 1000;
+      var speed = Math.abs(handDelta) / seconds;
+      // 프레임 간격이 달라도 같은 정도로 걸러지도록 시간 상수로 가중치를 구한다.
+      var alpha = 1 - Math.exp(-seconds / Math.max(component.data.speedSmoothing, 1e-4));
+      smoothedSpeed += (speed - smoothedSpeed) * alpha;
+    }
+
+    // 배율 = 속도 계수 × 거리 계수. 계단 없이 smoothstep으로 이어서 물체가 튀지 않게 한다.
+    function computeGain() {
+      var data = component.data;
+      // 레이는 어깨에서 rayOrigin을 지나므로 두 거리를 더하면 어깨~물체 거리가 된다.
+      var shoulderDistance = shoulderPosition.distanceTo(rayOrigin) + grabDistance;
+      var speedT = THREE.MathUtils.smoothstep(smoothedSpeed, data.slowSpeed, data.fastSpeed);
+      var distanceT = THREE.MathUtils.smoothstep(shoulderDistance, data.nearDistance, data.farDistance);
+
+      gainState.speed = smoothedSpeed;
+      gainState.shoulderDistance = shoulderDistance;
+      gainState.speedGain = THREE.MathUtils.lerp(data.minSpeedGain, data.maxSpeedGain, speedT);
+      gainState.distanceGain = THREE.MathUtils.lerp(1, data.maxDistanceGain, distanceT);
+      gainState.gain =
+        data.gainMode === "fixed"
+          ? data.fixedGain
+          : gainState.speedGain * gainState.distanceGain;
+      return gainState.gain;
+    }
+
+    function logGain(timeDelta) {
+      if (!component.data.debug) return;
+      debugLogTime += timeDelta;
+      if (debugLogTime < 200) return; // 콘솔이 넘치지 않게 0.2초마다
+      debugLogTime = 0;
+      console.log(
+        "hand gain",
+        getHandControls().data.hand,
+        "speed", gainState.speed.toFixed(3),
+        "dist", gainState.shoulderDistance.toFixed(2),
+        "speedGain", gainState.speedGain.toFixed(2),
+        "distGain", gainState.distanceGain.toFixed(2),
+        "gain", gainState.gain.toFixed(2),
+      );
+    }
+
     // 멀리 잡은 오브젝트를 레이 위에 유지하고, 손을 앞뒤로 움직인 만큼 증폭해 Pull/Push 한다.
-    function updateFarGrab() {
+    function updateFarGrab(timeDelta) {
       updatePinchPosition();
       pinchDelta.copy(pinchPosition).sub(lastPinchPosition);
       lastPinchPosition.copy(pinchPosition);
 
-      // 레이 시작점도 손과 함께 움직이므로, 나머지 (pushGain - 1)배만 더하면 총 pushGain배가 된다.
       var handDelta = pinchDelta.dot(localRayDirection);
+      updateHandSpeed(handDelta, timeDelta);
+      var gain = computeGain();
+      logGain(timeDelta);
+
+      // 레이 시작점도 손과 함께 움직이므로, 나머지 (gain - 1)배만 더하면 총 gain배가 된다.
       grabDistance = THREE.MathUtils.clamp(
-        grabDistance + handDelta * (pushGain - 1),
+        grabDistance + handDelta * (gain - 1),
         settings.data.minDistance,
         settings.data.maxDistance,
       );
@@ -264,7 +344,7 @@ AFRAME.registerComponent("hand-grabber", {
       updateHandMatrix();
       updateRay();
       if (heldEl && isNearGrab) updateGrabAnchor();
-      if (heldEl && !isNearGrab) updateFarGrab();
+      if (heldEl && !isNearGrab) updateFarGrab(timeDelta);
     };
 
     this.release = release;
