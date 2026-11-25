@@ -1,0 +1,32 @@
+{
+  "name": "a-painter",
+  "version": "0.1.1",
+  "description": "A-Painter",
+  "scripts": {
+    "atlas": "spritesheet-js --name brush_atlas --path assets/images brushes/*.png",
+    "build": "webpack --mode=production",
+    "build-dev": "webpack --mode=development",
+    "start": "webpack-dev-server --host 0.0.0.0 --mode=development",
+    "lint": "semistandard -v | snazzy"
+  },
+  "repository": "aframevr/a-painter",
+  "license": "MIT",
+  "semistandard": {
+    "ignore": [
+      "**/vendor/**",
+      "build.js"
+    ]
+  },
+  "devDependencies": {
+    "semistandard": "^16.0.1",
+    "snazzy": "^9.0.0",
+    "spritesheet-js": "^1.2.6",
+    "terser-webpack-plugin": "^5.3.1",
+    "webpack": "^5.69.1",
+    "webpack-cli": "^4.9.2",
+    "webpack-dev-server": "^4.7.4"
+  },
+  "dependencies": {
+    "aframe-tooltip-component": "^0.1.2"
+  }
+}
