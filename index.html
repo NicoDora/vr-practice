@@ -3,81 +3,148 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>VR 실습 1주차</title>
-    <script src="https://aframe.io/releases/1.8.0/aframe.min.js"></script>
-    <script src="js/systems/grab-settings.js"></script>
-    <script src="js/components/grab-highlight.js"></script>
-    <script src="js/components/mouse-grabbable.js"></script>
-    <script src="js/components/vr-grabber.js"></script>
-    <script src="js/components/hand-grabber.js"></script>
-    <script src="js/components/rig-movement.js"></script>
+    <title>VR 인터랙션 실습</title>
+    <style>
+      :root {
+        --bg: #1a1d3a;
+        --card: #252a4d;
+        --card-hover: #2e3460;
+        --text: #ffffff;
+        --muted: #9aa3b8;
+        --accent: #2ba7c4;
+        --line: #3a4070;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: var(--bg);
+        color: var(--text);
+        font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
+          "Malgun Gothic", "Noto Sans KR", sans-serif;
+        line-height: 1.5;
+      }
+      main {
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 56px 24px;
+      }
+      h1 {
+        margin: 0 0 8px;
+        font-size: 36px;
+      }
+      .subtitle {
+        margin: 0 0 40px;
+        color: var(--muted);
+        font-size: 18px;
+      }
+      .list {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 20px;
+      }
+      /* Quest 브라우저에서 손 레이로 누르기 쉽도록 카드 전체를 크게 누를 수 있게 한다. */
+      .card {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        min-height: 200px;
+        padding: 24px;
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        background: var(--card);
+        color: inherit;
+        text-decoration: none;
+        transition: background 0.15s, border-color 0.15s;
+      }
+      a.card:hover,
+      a.card:focus-visible {
+        background: var(--card-hover);
+        border-color: var(--accent);
+        outline: none;
+      }
+      .period {
+        color: var(--accent);
+        font-size: 15px;
+        font-weight: 700;
+      }
+      .card h2 {
+        margin: 0;
+        font-size: 22px;
+      }
+      .card p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 16px;
+      }
+      .button {
+        margin-top: auto;
+        align-self: flex-start;
+        padding: 12px 22px;
+        border-radius: 999px;
+        background: var(--accent);
+        color: #ffffff;
+        font-size: 17px;
+        font-weight: 700;
+      }
+      .card.disabled {
+        opacity: 0.55;
+      }
+      .card.disabled .button {
+        background: var(--line);
+        color: var(--muted);
+      }
+      footer {
+        margin-top: 48px;
+        color: var(--muted);
+        font-size: 14px;
+      }
+      footer a {
+        color: var(--muted);
+      }
+      @media (max-width: 600px) {
+        main {
+          padding: 32px 16px;
+        }
+        h1 {
+          font-size: 28px;
+        }
+      }
+    </style>
   </head>
   <body>
-    <a-scene cursor__mouse="rayOrigin: mouse" raycaster="objects: .grabbable">
-      <!-- rig를 움직이면 카메라, 컨트롤러, 손이 함께 이동한다. -->
-      <a-entity id="rig" position="0 0 0" rig-movement>
-        <a-entity camera look-controls position="0 1.6 0"></a-entity>
+    <main>
+      <h1>VR 인터랙션 실습</h1>
+      <p class="subtitle">Quest 2 브라우저에서 실습을 골라 들어가세요.</p>
 
-        <a-entity
-          id="rightHand"
-          laser-controls="hand: right"
-          vr-grabber
-          raycaster="objects: .grabbable; far: 10; enabled: false"
-        ></a-entity>
-        <a-entity
-          id="leftHand"
-          laser-controls="hand: left"
-          vr-grabber
-          raycaster="objects: .grabbable; far: 10; enabled: false"
-        ></a-entity>
+      <div class="list">
+        <a class="card" href="grab/">
+          <span class="period">1·2주차 · 기초 학습</span>
+          <h2>오브젝트 잡기</h2>
+          <p>마우스, 컨트롤러, 핸드트래킹으로 물체를 잡고 Pull/Push 합니다.</p>
+          <span class="button">들어가기</span>
+        </a>
 
-        <a-entity
-          id="rightHandTracking"
-          hand-tracking-controls="hand: right"
-          hand-grabber
-          raycaster="objects: .grabbable; far: 10; showLine: true"
-          cursor="rayOrigin: entity; fuse: false"
-        ></a-entity>
-        <a-entity
-          id="leftHandTracking"
-          hand-tracking-controls="hand: left"
-          hand-grabber
-          raycaster="objects: .grabbable; far: 10; showLine: true"
-          cursor="rayOrigin: entity; fuse: false"
-        ></a-entity>
-      </a-entity>
+        <div class="card disabled" aria-disabled="true">
+          <span class="period">3·4주차 · 실습 1</span>
+          <h2>A-Painter 핀치 드로잉</h2>
+          <p>핀치 동작으로 VR 공간에 그림을 그립니다.</p>
+          <span class="button">준비 중</span>
+        </div>
 
-      <a-sky color="#ECECEC"></a-sky>
+        <div class="card disabled" aria-disabled="true">
+          <span class="period">12월 · 실습 2</span>
+          <h2>UR5 로봇 역기구학</h2>
+          <p>UR5 로봇 팔을 컨트롤러와 손으로 움직입니다.</p>
+          <span class="button">준비 중</span>
+        </div>
+      </div>
 
-      <a-plane
-        position="0 0 -4"
-        rotation="-90 0 0"
-        width="10"
-        height="10"
-        color="#7BC8A4"
-      ></a-plane>
-
-      <a-box
-        id="box1"
-        grab-highlight
-        mouse-grabbable
-        class="grabbable"
-        position="-1 0.5 -2"
-        color="#4CC3D9"
-        width="1"
-        height="1"
-        depth="1"
-      ></a-box>
-      <a-cylinder
-        id="cylinder1"
-        grab-highlight
-        mouse-grabbable
-        class="grabbable"
-        position="0.5 0.5 -2.5"
-        color="#FFC65D"
-        radius="0.4"
-        height="1"
-      ></a-cylinder>
-    </a-scene>
+      <footer>
+        <a href="https://github.com/NicoDora/vr-practice">github.com/NicoDora/vr-practice</a>
+      </footer>
+    </main>
   </body>
 </html>
