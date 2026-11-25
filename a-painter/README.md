@@ -1,5 +1,6 @@
 > 이 폴더는 [aframevr/a-painter](https://github.com/aframevr/a-painter) 커밋 `0deba1f` (2022-10-26)을 복사한 것입니다 (MIT License).
 > 변경 사항: Google Analytics(`vendor/ga.js`, `vr-analytics`) 제거, `vendor/*.map`과 `img/icon.psd` 제외.
+> 추가: 핸드트래킹 핀치 드로잉 (`js/hand-paint.js`, `index.html`의 `#right-pinch-brush`).
 
 # A-Painter
 
