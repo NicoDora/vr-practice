@@ -25,6 +25,8 @@ AFRAME.registerComponent('hand-paint', {
     // 손목에서 검지 끝까지가 이보다 짧으면 실제 손이 아니라고 본다. (m, 실제 손은 15cm 안팎)
     minHandSize: { default: 0.05 },
 
+    showTip: { default: true }, // 핀치 지점에 지금 브러시 색·굵기로 작은 점을 보여 준다.
+
     debug: { default: false }
   },
 
@@ -46,6 +48,19 @@ AFRAME.registerComponent('hand-paint', {
 
     el.object3D.visible = false;
 
+    // 붓끝 표시: 그리기 전에 바뀐 색과 굵기를 바로 확인할 수 있게 한다.
+    if (this.data.showTip) {
+      this.tipMesh = new THREE.Mesh(
+        new THREE.SphereGeometry(0.5, 16, 12),
+        new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 })
+      );
+      el.object3D.add(this.tipMesh);
+      this.updateTip = this.updateTip.bind(this);
+      el.addEventListener('brushcolor-changed', this.updateTip);
+      el.addEventListener('brushsize-changed', this.updateTip);
+      this.updateTip();
+    }
+
     // brush.hand는 엔티티 id로 정해지는데, 손 브러시는 컨트롤러 붓끝 보정을 쓰면 안 된다.
     // 'pinch'로 표시해 두고 아래 getPointerPosition 보정에서 걸러 낸다.
     el.components.brush.hand = 'pinch';
@@ -55,8 +70,21 @@ AFRAME.registerComponent('hand-paint', {
     sceneEl.addEventListener('exit-vr', this.onExitVR);
   },
 
+  updateTip: function () {
+    var brush = this.el.components.brush;
+    if (!this.tipMesh || !brush) { return; }
+    this.tipMesh.material.color.copy(brush.color);
+    // 브러시 굵기(지름)와 같게 하되, 너무 작으면 안 보이므로 최소 6mm
+    this.tipMesh.scale.setScalar(Math.max(brush.data.size, 0.006));
+  },
+
   remove: function () {
     this.stopPainting();
+    if (this.tipMesh) {
+      this.el.object3D.remove(this.tipMesh);
+      this.el.removeEventListener('brushcolor-changed', this.updateTip);
+      this.el.removeEventListener('brushsize-changed', this.updateTip);
+    }
     this.el.sceneEl.removeEventListener('exit-vr', this.onExitVR);
   },
 
@@ -99,6 +127,8 @@ AFRAME.registerComponent('hand-paint', {
     this.painting = true;
     this.holding = false;
     this.el.emit('paint', { value: this.data.pressure });
+    // 손 메뉴(hand-menu)의 버튼은 컨트롤러 트리거처럼 triggerchanged로 누른다.
+    this.el.emit('triggerchanged', { value: 1 });
     if (this.data.debug) { console.log('hand-paint start', this.data.hand); }
   },
 
@@ -107,6 +137,7 @@ AFRAME.registerComponent('hand-paint', {
     this.painting = false;
     this.holding = false;
     this.el.emit('paint', { value: 0 });
+    this.el.emit('triggerchanged', { value: 0 });
     if (this.data.debug) { console.log('hand-paint end', this.data.hand); }
   },
 
