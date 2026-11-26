@@ -10,6 +10,7 @@
     <script src="build.js"></script>
     <script src="js/hand-paint.js"></script>
     <script src="js/hand-model-v4.js"></script>
+    <script src="js/hand-undo.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/clipboard@1.5.12/dist/clipboard.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/aframe-gltf-exporter-component@0.1.0/dist/aframe-gltf-exporter-component.min.js"></script>
     <script src="vendor/aframe-blink-controls.js"></script>
@@ -215,6 +216,7 @@
         <a-entity id="right-hand-tracking" hand-tracking-controls="hand: right"></a-entity>
         <!-- 핸드트래킹: 오른손 핀치로 그리는 브러시 (js/hand-paint.js) -->
         <a-entity id="right-pinch-brush" brush hand-paint="hand: right"></a-entity>
+        <a-entity id="left-hand-undo" hand-undo="hand: left; target: #right-pinch-brush"></a-entity>
       </a-entity>
     </a-scene>
     <a href="https://aframe.io/a-painter/"><div id="apainter-logo" class="hidden"></div><div id="apainter-author" style="display:none" class="hidden">authorname</div></a>
