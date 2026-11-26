@@ -22,6 +22,8 @@ AFRAME.registerComponent('hand-paint', {
     pinchEndDistance: { default: 0.025 }, // 이보다 벌어지면 그리기 끝
 
     lostTrackingTimeout: { default: 150 }, // ms, 손 추적이 이 시간 이상 끊기면 그리기를 끝낸다.
+    // 손목에서 검지 끝까지가 이보다 짧으면 실제 손이 아니라고 본다. (m, 실제 손은 15cm 안팎)
+    minHandSize: { default: 0.05 },
 
     debug: { default: false }
   },
@@ -34,6 +36,7 @@ AFRAME.registerComponent('hand-paint', {
     this.indexTip = new THREE.Vector3();
     this.pinchPoint = new THREE.Vector3();
     this.wristQuaternion = new THREE.Quaternion();
+    this.wristPosition = new THREE.Vector3();
 
     this.painting = false;
     this.holding = false; // 손가락을 떼는 중이라 붓끝을 멈춘 상태
@@ -81,7 +84,12 @@ AFRAME.registerComponent('hand-paint', {
 
     this.thumbTip.copy(thumb.transform.position);
     this.indexTip.copy(index.transform.position);
+    this.wristPosition.copy(wrist.transform.position);
     this.wristQuaternion.copy(wrist.transform.orientation);
+
+    // 손이 카메라 시야를 벗어나면 Quest가 추적 중으로 둔 채 모든 관절을 한 점에 모아서 보낸다.
+    // 엄지와 검지 끝이 겹쳐 핀치로 잡히고, 움직이지 않는 가짜 선이 시작되므로 추적이 끊긴 것으로 처리한다.
+    if (this.wristPosition.distanceTo(this.indexTip) < this.data.minHandSize) { return false; }
     return true;
   },
 
