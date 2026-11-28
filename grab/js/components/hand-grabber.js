@@ -53,8 +53,30 @@ AFRAME.registerComponent("hand-grabber", {
     var debugLogTime = 0;
 
     // 현재 배율 상태. DevTools에서 document.querySelector("[hand-grabber]").components["hand-grabber"].gainState로 볼 수 있다.
-    var gainState = { speed: 0, shoulderDistance: 0, speedGain: 1, distanceGain: 1, gain: 1 };
+    // 테스트용 표시(gain-object-label, gain-wrist-gauge, gain-panel)도 이 값을 읽는다.
+    var gainState = {
+      mode: "adaptive",
+      speed: 0,
+      shoulderDistance: 0,
+      speedGain: 1,
+      distanceGain: 1,
+      gain: 1,
+      // 레이로 가리키는 물체 (잡지 않았을 때)
+      hoverEl: null,
+      hoverDistance: 0, // 어깨~레이가 닿은 지점 (m)
+      // 멀리 잡은 동안의 측정값
+      holding: false,
+      heldEl: null,
+      startDistance: 0, // 잡은 순간 어깨~물체 (m)
+      handNet: 0, // 레이 방향 손 이동 합계 (m, 밀면 +)
+      objectMoved: 0, // 어깨~물체 거리 변화 (m, 밀면 +)
+      peakSpeed: 0,
+      startTime: 0,
+      lastResult: null, // 마지막으로 놓은 잡기의 기록
+    };
     this.gainState = gainState;
+    // 멀리 잡기를 놓을 때마다 기록을 쌓는다. DevTools에서 console.table(gainLog)로 볼 수 있다.
+    window.gainLog = window.gainLog || [];
 
     var jointMatrix = new THREE.Matrix4();
     var handMatrixInverse = new THREE.Matrix4();
@@ -173,8 +195,42 @@ AFRAME.registerComponent("hand-grabber", {
       el.setAttribute("raycaster", { enabled: active, showLine: active });
     }
 
+    // 어깨~물체 거리: 레이는 어깨에서 rayOrigin을 지나므로 두 거리를 더한다.
+    function getShoulderDistance(distanceFromRayOrigin) {
+      return shoulderPosition.distanceTo(rayOrigin) + distanceFromRayOrigin;
+    }
+
+    // 멀리 잡기 측정을 끝내고 기록을 남긴다.
+    function finishMeasurement() {
+      if (!gainState.holding) return;
+      var record = {
+        time: new Date().toISOString(),
+        hand: getHandControls().data.hand,
+        object: heldEl.id,
+        mode: gainState.mode,
+        startDistance: +gainState.startDistance.toFixed(3),
+        endDistance: +(gainState.startDistance + gainState.objectMoved).toFixed(3),
+        handNet: +gainState.handNet.toFixed(4),
+        objectMoved: +gainState.objectMoved.toFixed(4),
+        // 손을 거의 안 움직였으면 배율이 의미 없으므로 비워 둔다.
+        effectiveGain:
+          Math.abs(gainState.handNet) >= 0.02
+            ? +(gainState.objectMoved / gainState.handNet).toFixed(2)
+            : null,
+        peakSpeed: +gainState.peakSpeed.toFixed(3),
+        durationMs: Math.round(performance.now() - gainState.startTime),
+      };
+      window.gainLog.push(record);
+      gainState.lastResult = record;
+      gainState.holding = false;
+      gainState.heldEl = null;
+      console.log("hand gain result", JSON.stringify(record));
+      sceneEl.emit("gainmeasured", record);
+    }
+
     function release() {
       if (!heldEl) return;
+      if (!isNearGrab) finishMeasurement();
 
       if (isNearGrab) originalParent.attach(heldEl.object3D);
       console.log("hand release", heldEl.id);
@@ -227,16 +283,61 @@ AFRAME.registerComponent("hand-grabber", {
         updatePinchPosition();
         lastPinchPosition.copy(pinchPosition);
         smoothedSpeed = 0; // 잡는 순간은 정밀 조작부터 시작한다.
+
+        gainState.mode = component.data.gainMode;
+        gainState.holding = true;
+        gainState.heldEl = target;
+        gainState.hoverEl = null;
+        gainState.startDistance = getShoulderDistance(grabDistance);
+        gainState.shoulderDistance = gainState.startDistance;
+        gainState.handNet = 0;
+        gainState.objectMoved = 0;
+        gainState.peakSpeed = 0;
+        gainState.startTime = performance.now();
+        sceneEl.emit("gaingrabstart", { hand: getHandControls().data.hand, el: target });
         return true;
       }
       return false;
+    }
+
+    // 3) 레이가 맨 먼저 닿은 것이 테스트 패널 버튼이면 누른다. (버튼 뒤의 물체는 잡지 않음)
+    function tryPressButton() {
+      var raycaster = el.components.raycaster;
+      if (!raycaster || !rayActive) return false;
+      var first = raycaster.intersections[0];
+      if (!first || !first.object.el.classList.contains("hand-button")) return false;
+      first.object.el.emit("handpress", { hand: getHandControls().data.hand });
+      return true;
+    }
+
+    // 잡지 않았을 때 레이가 가리키는 물체와 거리를 기록한다. (물체 위 거리 표시용)
+    function updateHover() {
+      gainState.hoverEl = null;
+      if (heldEl) return;
+      var raycaster = el.components.raycaster;
+      if (!raycaster || !rayActive) return;
+      var intersections = raycaster.intersections;
+      for (var i = 0; i < intersections.length; i++) {
+        var target = intersections[i].object.el;
+        if (target.classList.contains("hand-button")) return;
+        if (!target.classList.contains("grabbable") || target.is("grabbed")) continue;
+        gainState.hoverEl = target;
+        gainState.hoverDistance = getShoulderDistance(intersections[i].distance);
+        return;
+      }
     }
 
     this.onPinchStarted = function (event) {
       if (heldEl || !isTracking()) return;
 
       updateHandMatrix();
-      if (tryNearGrab(event.detail.position) || tryFarGrab()) {
+      if (tryNearGrab(event.detail.position)) {
+        heldEl.addState("grabbed");
+        console.log("hand grab", heldEl.id, "(near)");
+        return;
+      }
+      if (tryPressButton()) return;
+      if (tryFarGrab()) {
         console.log("hand grab", heldEl.id, isNearGrab ? "(near)" : "(far)");
         heldEl.addState("grabbed");
       }
@@ -266,11 +367,11 @@ AFRAME.registerComponent("hand-grabber", {
     // 배율 = 속도 계수 × 거리 계수. 계단 없이 smoothstep으로 이어서 물체가 튀지 않게 한다.
     function computeGain() {
       var data = component.data;
-      // 레이는 어깨에서 rayOrigin을 지나므로 두 거리를 더하면 어깨~물체 거리가 된다.
-      var shoulderDistance = shoulderPosition.distanceTo(rayOrigin) + grabDistance;
+      var shoulderDistance = getShoulderDistance(grabDistance);
       var speedT = THREE.MathUtils.smoothstep(smoothedSpeed, data.slowSpeed, data.fastSpeed);
       var distanceT = THREE.MathUtils.smoothstep(shoulderDistance, data.nearDistance, data.farDistance);
 
+      gainState.mode = data.gainMode;
       gainState.speed = smoothedSpeed;
       gainState.shoulderDistance = shoulderDistance;
       gainState.speedGain = THREE.MathUtils.lerp(data.minSpeedGain, data.maxSpeedGain, speedT);
@@ -316,6 +417,12 @@ AFRAME.registerComponent("hand-grabber", {
         settings.data.maxDistance,
       );
 
+      // 측정: 손은 레이 방향 이동을 더하고, 물체는 어깨~물체 거리 변화로 잰다.
+      gainState.handNet += handDelta;
+      gainState.shoulderDistance = getShoulderDistance(grabDistance);
+      gainState.objectMoved = gainState.shoulderDistance - gainState.startDistance;
+      gainState.peakSpeed = Math.max(gainState.peakSpeed, smoothedSpeed);
+
       targetWorldPosition
         .copy(rayOrigin)
         .addScaledVector(rayDirection, grabDistance)
@@ -333,6 +440,7 @@ AFRAME.registerComponent("hand-grabber", {
     this.updateHand = function (timeDelta) {
       if (!isTracking() || !sceneEl.camera) {
         setRayActive(false);
+        gainState.hoverEl = null;
         lostTrackingTime += timeDelta;
         // 손을 잃으면 pinchended가 오지 않을 수 있어 일정 시간 뒤 직접 놓는다.
         if (heldEl && lostTrackingTime > lostTrackingTimeout) release();
@@ -343,6 +451,7 @@ AFRAME.registerComponent("hand-grabber", {
       setRayActive(true);
       updateHandMatrix();
       updateRay();
+      updateHover();
       if (heldEl && isNearGrab) updateGrabAnchor();
       if (heldEl && !isNearGrab) updateFarGrab(timeDelta);
     };

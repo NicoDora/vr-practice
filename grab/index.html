@@ -12,6 +12,12 @@
     <script src="js/components/hand-grabber.js"></script>
     <script src="js/components/hand-collapse-guard.js"></script>
     <script src="js/components/rig-movement.js"></script>
+    <!-- Pull/Push 배율 테스트 화면 (거리 눈금, 물체 라벨, 손목 게이지, 모드 패널) -->
+    <script src="js/utils/gain-test-utils.js"></script>
+    <script src="js/components/gain-floor-marks.js"></script>
+    <script src="js/components/gain-object-label.js"></script>
+    <script src="js/components/gain-wrist-gauge.js"></script>
+    <script src="js/components/gain-panel.js"></script>
     <style>
       /* VR에 들어가기 전 화면에서 실습 목록으로 돌아가는 링크 */
       .back-link {
@@ -32,7 +38,7 @@
   </head>
   <body>
     <a class="back-link" href="../">← 실습 목록</a>
-    <a-scene cursor__mouse="rayOrigin: mouse" raycaster="objects: .grabbable">
+    <a-scene cursor__mouse="rayOrigin: mouse" raycaster="objects: .grabbable, .hand-button">
       <!-- rig를 움직이면 카메라, 컨트롤러, 손이 함께 이동한다. -->
       <a-entity id="rig" position="0 0 0" rig-movement>
         <a-entity camera look-controls position="0 1.6 0"></a-entity>
@@ -55,7 +61,7 @@
           hand-tracking-controls="hand: right"
           hand-collapse-guard
           hand-grabber
-          raycaster="objects: .grabbable; far: 10; showLine: true"
+          raycaster="objects: .grabbable, .hand-button; far: 10; showLine: true"
           cursor="rayOrigin: entity; fuse: false"
         ></a-entity>
         <a-entity
@@ -63,10 +69,18 @@
           hand-tracking-controls="hand: left"
           hand-collapse-guard
           hand-grabber
-          raycaster="objects: .grabbable; far: 10; showLine: true"
+          gain-wrist-gauge
+          raycaster="objects: .grabbable, .hand-button; far: 10; showLine: true"
           cursor="rayOrigin: entity; fuse: false"
         ></a-entity>
+
+        <!-- 발 기준 거리 눈금 (rig와 함께 움직임) -->
+        <a-entity gain-floor-marks></a-entity>
       </a-entity>
+
+      <!-- 배율 테스트: 물체 위 거리·배율 라벨, 왼쪽 앞 모드 패널 -->
+      <a-entity gain-object-label></a-entity>
+      <a-entity gain-panel position="-1.9 1.25 -1.3" rotation="0 55 0"></a-entity>
 
       <a-sky color="#ECECEC"></a-sky>
 
