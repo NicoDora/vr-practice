@@ -10,6 +10,7 @@
     <script src="js/components/mouse-grabbable.js"></script>
     <script src="js/components/vr-grabber.js"></script>
     <script src="js/components/hand-grabber.js"></script>
+    <script src="js/components/hand-collapse-guard.js"></script>
     <script src="js/components/rig-movement.js"></script>
     <style>
       /* VR에 들어가기 전 화면에서 실습 목록으로 돌아가는 링크 */
@@ -52,6 +53,7 @@
         <a-entity
           id="rightHandTracking"
           hand-tracking-controls="hand: right"
+          hand-collapse-guard
           hand-grabber
           raycaster="objects: .grabbable; far: 10; showLine: true"
           cursor="rayOrigin: entity; fuse: false"
@@ -59,6 +61,7 @@
         <a-entity
           id="leftHandTracking"
           hand-tracking-controls="hand: left"
+          hand-collapse-guard
           hand-grabber
           raycaster="objects: .grabbable; far: 10; showLine: true"
           cursor="rayOrigin: entity; fuse: false"
